@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MapApp">
+<meta name="theme-color" content="#185FA5">
+<title>MapApp</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f4f4f4;color:#1a1a1a}
+#app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+#header{background:#185FA5;color:#fff;padding:10px 14px 6px;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.18)}
+#header h1{font-size:17px;font-weight:600;margin-bottom:6px}
+#toolbar{display:flex;gap:6px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;font-size:12px;font-weight:500;border:none;border-radius:8px;background:rgba(255,255,255,0.18);color:#fff;cursor:pointer;white-space:nowrap}
+.btn:active{opacity:0.7}
+.btn.active{background:rgba(255,255,255,0.9);color:#185FA5}
+.btn svg{width:15px;height:15px;flex-shrink:0}
+#map{flex:1;min-height:0}
+#status-bar{background:#fff;border-top:1px solid #e0e0e0;padding:5px 12px;display:flex;gap:12px;font-size:11px;color:#666;flex-shrink:0;overflow-x:auto;white-space:nowrap}
+.status-item{display:flex;align-items:center;gap:4px}
+#panel{flex-shrink:0;background:#fff;border-top:1px solid #e0e0e0;max-height:32vh;display:flex;flex-direction:column}
+#tabs{display:flex;border-bottom:1px solid #e0e0e0}
+.tab{flex:1;padding:9px 4px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;color:#888;border-bottom:2px solid transparent}
+.tab.active{color:#185FA5;border-bottom-color:#185FA5}
+#panel-body{overflow-y:auto;flex:1}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.empty{padding:18px;text-align:center;font-size:13px;color:#aaa}
+.list-item{padding:10px 14px;border-bottom:1px solid #f0f0f0;font-size:13px}
+.list-item:last-child{border-bottom:none}
+.item-name{font-weight:600;margin-bottom:2px}
+.item-meta{font-size:11px;color:#888;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+.go-btn{font-size:11px;padding:2px 8px;background:#E6F1FB;color:#185FA5;border:none;border-radius:6px;cursor:pointer;font-weight:500}
+.rm-btn{font-size:11px;padding:2px 8px;background:#FCEBEB;color:#A32D2D;border:none;border-radius:6px;cursor:pointer;font-weight:500}
+/* Modals */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:2000;align-items:flex-end;justify-content:center}
+.modal-bg.open{display:flex}
+.modal-sheet{background:#fff;border-radius:18px 18px 0 0;padding:20px 18px 32px;width:100%;max-width:480px;animation:slideUp 0.25s ease}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-sheet h3{font-size:16px;font-weight:600;margin-bottom:12px}
+.modal-sheet input,.modal-sheet textarea{width:100%;font-size:14px;padding:10px 12px;border:1px solid #d0d0d0;border-radius:10px;background:#fafafa;color:#1a1a1a;margin-bottom:10px;outline:none;font-family:inherit}
+.modal-sheet textarea{height:90px;resize:vertical}
+.modal-coords{font-size:12px;color:#888;margin-bottom:12px}
+.modal-btns{display:flex;gap:8px}
+.modal-btns button{flex:1;padding:12px;font-size:14px;font-weight:600;border:none;border-radius:10px;cursor:pointer}
+.btn-cancel{background:#f0f0f0;color:#444}
+.btn-primary{background:#185FA5;color:#fff}
+.btn-green{background:#1D9E75;color:#fff}
+.export-summary{font-size:12px;color:#666;margin-bottom:12px;padding:8px 12px;background:#f5f5f5;border-radius:8px}
+.save-instructions{font-size:13px;color:#333;line-height:1.8}
+.measure-label{background:rgba(255,255,255,0.9)!important;border:1px solid #1D9E75!important;color:#1D9E75!important;font-size:11px!important;font-weight:600!important;padding:2px 5px!important;border-radius:4px!important;white-space:nowrap}
+.leaflet-tooltip.measure-label::before{display:none}
+.leaflet-popup-content{font-size:13px}
+#toast{position:fixed;bottom:40%;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.72);color:#fff;padding:8px 18px;border-radius:20px;font-size:13px;z-index:3000;pointer-events:none;opacity:0;transition:opacity 0.3s}
+#find-me-btn{position:absolute;bottom:90px;right:12px;z-index:1000;width:44px;height:44px;border-radius:50%;background:#185FA5;border:none;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px}
+#find-me-btn:active{opacity:0.7}
+#search-bar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;width:calc(100% - 24px);max-width:380px;display:flex;gap:0;box-shadow:0 2px 8px rgba(0,0,0,0.18);border-radius:10px;overflow:hidden}
+#search-input{flex:1;font-size:13px;padding:9px 12px;border:none;outline:none;background:#fff;color:#1a1a1a}
+#search-btn{background:#185FA5;color:#fff;border:none;padding:9px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+#gps-banner{display:none;position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:1000;background:#c0392b;color:#fff;font-size:12px;line-height:1.6;padding:10px 14px;border-radius:10px;width:calc(100% - 24px);max-width:380px;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(24,95,165,0.5)}70%{box-shadow:0 0 0 12px rgba(24,95,165,0)}100%{box-shadow:0 0 0 0 rgba(24,95,165,0)}}
+.gps-pulse{animation:pulse 1.5s infinite}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <h1>&#x1F4CD; MapApp</h1>
+    <div id="toolbar">
+      <label class="btn" for="file-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        KML/KMZ
+      </label>
+      <input type="file" id="file-input" accept=".kml,.kmz" style="display:none">
+
+      <button class="btn" id="btn-gps" onclick="toggleGPS()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        <span id="gps-label">GPS</span>
+      </button>
+
+      <button class="btn" id="btn-draw" onclick="toggleDraw()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        Draw
+      </button>
+      <button class="btn" id="btn-draw-done" style="display:none" onclick="finishPolyline()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Done
+      </button>
+
+      <button class="btn" id="btn-note" onclick="addNoteAtGPS()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        Note
+      </button>
+
+      <button class="btn" id="btn-measure" onclick="toggleMeasure()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="12" x2="6" y2="8"/><line x1="2" y1="12" x2="6" y2="16"/><line x1="22" y1="12" x2="18" y2="8"/><line x1="22" y1="12" x2="18" y2="16"/><line x1="8" y1="9" x2="8" y2="12"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="16" y1="9" x2="16" y2="12"/></svg>
+        Measure
+      </button>
+      <button class="btn" id="btn-measure-done" style="display:none" onclick="finishMeasure()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Done
+      </button>
+
+      <button class="btn" onclick="showExportModal()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+
+      <button class="btn" onclick="showSaveHelp()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save App
+      </button>
+    </div>
+  </div>
+
+  <div id="map" style="position:relative">
+    <div id="search-bar">
+      <input id="search-input" type="text" placeholder="Search place or enter lat,lng..." onkeydown="if(event.key==='Enter')searchLocation()">
+      <button id="search-btn" onclick="searchLocation()">Go</button>
+    </div>
+    <div id="gps-banner" onclick="this.style.display='none'">&#x2716; Tap to dismiss</div>
+    <button id="find-me-btn" onclick="findMe()" title="Find my location">&#x25CE;</button>
+  </div>
+
+  <div id="status-bar">
+    <span class="status-item">&#x1F310; <span id="coord-display">Tap map to see coords</span></span>
+    <span class="status-item">&#x1F4C2; <span id="layer-count">0 layers</span></span>
+    <span class="status-item">&#x1F4CC; <span id="note-count">0 notes</span></span>
+    <span class="status-item">&#x1F4E1; <span id="accuracy-display">GPS off</span></span>
+    <span class="status-item" id="measure-status" style="display:none">&#x1F4CF; <span id="measure-display">0m</span></span>
+  </div>
+
+  <div id="panel">
+    <div id="tabs">
+      <div class="tab active" onclick="switchTab('layers')">Layers</div>
+      <div class="tab" onclick="switchTab('notes')">Notes</div>
+    </div>
+    <div id="panel-body">
+      <div id="tab-layers" class="tab-content active">
+        <div class="empty" id="layers-empty">No KML/KMZ loaded yet</div>
+        <div id="layers-list"></div>
+      </div>
+      <div id="tab-notes" class="tab-content">
+        <div class="empty" id="notes-empty">Start GPS then tap Note to add a location note</div>
+        <div id="notes-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Note modal -->
+<div id="note-modal" class="modal-bg">
+  <div class="modal-sheet">
+    <h3>Add note at current location</h3>
+    <input type="text" id="note-title-input" placeholder="Title (optional)">
+    <textarea id="note-body-input" placeholder="Write your note here..."></textarea>
+    <div class="modal-coords" id="modal-coords"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeNoteModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveNote()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export modal -->
+<div id="export-modal" class="modal-bg">
+  <div class="modal-sheet">
+    <h3>Export data</h3>
+    <div class="export-summary" id="export-summary"></div>
+    <input type="text" id="export-filename" placeholder="Filename (without extension)">
+    <div class="modal-btns" style="margin-bottom:10px">
+      <button class="btn-primary" onclick="doExport('kml')">&#8659; KML</button>
+      <button class="btn-green" onclick="doExport('kmz')">&#8659; KMZ</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="document.getElementById('export-modal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Save help modal -->
+<div id="save-modal" class="modal-bg">
+  <div class="modal-sheet">
+    <h3>Save this app to your phone</h3>
+    <div class="save-instructions">
+      <b>Android (Chrome):</b><br>
+      1. Open this HTML file in Chrome<br>
+      2. Tap the &#8942; menu (top-right)<br>
+      3. Tap <b>"Add to Home screen"</b><br>
+      4. Tap Add &#x2714;<br><br>
+      <b>iPhone (Safari):</b><br>
+      1. Open this HTML file in Safari<br>
+      2. Tap the Share button &#x2B06;<br>
+      3. Tap <b>"Add to Home Screen"</b><br>
+      4. Tap Add &#x2714;<br><br>
+      <b>Tip:</b> Use <b>Export</b> to save your drawn lines and notes as KML/KMZ before closing &mdash; data is lost when you close the browser.
+    </div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn-primary" onclick="document.getElementById('save-modal').classList.remove('open')">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ── Map init ────────────────────────────────────────────────────
+const map = L.map('map', {zoomControl:true}).setView([25.0, 121.5], 8);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19, attribution: '© OpenStreetMap contributors'
+}).addTo(map);
+
+// ── State ───────────────────────────────────────────────────────
+let gpsActive=false, gpsWatchId=null, gpsMarker=null, gpsCircle=null, currentPos=null;
+let drawMode=false, drawPoints=[], drawPolyline=null, drawMarkers=[];
+let measureMode=false, measurePoints=[], measurePolyline=null, measureMarkers=[], measureLabels=[];
+let notes=[], layers=[];
+const COLORS=['#185FA5','#1D9E75','#D85A30','#D4537E','#9333EA','#BA7517'];
+
+// ── GPS ─────────────────────────────────────────────────────────
+function toggleGPS(){
+  if(!gpsActive){
+    if(!navigator.geolocation){
+      alert('Geolocation is not supported by this browser.');
+      return;
+    }
+    document.getElementById('accuracy-display').textContent='Acquiring...';
+    document.getElementById('btn-gps').classList.add('active');
+    document.getElementById('gps-label').textContent='Stop GPS';
+    // Try to get position; if it fails show the banner with tips
+    gpsWatchId = navigator.geolocation.watchPosition(onGPS, onGPSErr,
+      {enableHighAccuracy:true, maximumAge:2000, timeout:15000});
+    gpsActive = true;
+  } else {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsActive=false;
+    document.getElementById('gps-label').textContent='GPS';
+    document.getElementById('btn-gps').classList.remove('active');
+    document.getElementById('accuracy-display').textContent='GPS off';
+    document.getElementById('find-me-btn').classList.remove('gps-pulse');
+    if(gpsMarker){ map.removeLayer(gpsMarker); gpsMarker=null; }
+    if(gpsCircle){ map.removeLayer(gpsCircle); gpsCircle=null; }
+    currentPos=null;
+  }
+}
+
+function onGPS(pos){
+  document.getElementById('gps-banner').style.display='none';
+  const {latitude:lat, longitude:lng, accuracy} = pos.coords;
+  currentPos = {lat, lng};
+  document.getElementById('coord-display').textContent = lat.toFixed(5)+', '+lng.toFixed(5);
+  document.getElementById('accuracy-display').textContent = '+/-'+Math.round(accuracy)+'m';
+  document.getElementById('find-me-btn').classList.add('gps-pulse');
+  if(!gpsMarker){
+    gpsMarker = L.circleMarker([lat,lng],{radius:9,color:'#fff',weight:3,fillColor:'#185FA5',fillOpacity:1}).addTo(map);
+    map.setView([lat,lng], 16);
+  } else { gpsMarker.setLatLng([lat,lng]); }
+  if(!gpsCircle){
+    gpsCircle = L.circle([lat,lng],{radius:accuracy,color:'#185FA5',fillColor:'#B5D4F4',fillOpacity:0.15,weight:1}).addTo(map);
+  } else { gpsCircle.setLatLng([lat,lng]).setRadius(accuracy); }
+}
+
+function onGPSErr(e){
+  let msg = 'GPS error';
+  if(e.code===1) msg = 'GPS denied';
+  else if(e.code===2) msg = 'GPS unavailable';
+  else if(e.code===3) msg = 'GPS timed out';
+  document.getElementById('accuracy-display').textContent = msg;
+  if(gpsWatchId){ navigator.geolocation.clearWatch(gpsWatchId); }
+  gpsActive=false;
+  document.getElementById('gps-label').textContent='GPS';
+  document.getElementById('btn-gps').classList.remove('active');
+  document.getElementById('find-me-btn').classList.remove('gps-pulse');
+  const banner = document.getElementById('gps-banner');
+  banner.style.display='block';
+  if(e.code===1){
+    banner.textContent='Location blocked. Fix: tap info icon in Chrome address bar > Site settings > Location > Allow. Or: long-press the map to set location manually.';
+  } else {
+    banner.textContent='GPS unavailable. Long-press the map to set your location manually.';
+  }
+}
+
+function findMe(){
+  if(currentPos){
+    map.setView([currentPos.lat, currentPos.lng], 17);
+    showToast('Centered on your location');
+    return;
+  }
+  if(!navigator.geolocation){ alert('Geolocation not supported'); return; }
+  document.getElementById('accuracy-display').textContent='Acquiring...';
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      onGPS(pos);
+      if(!gpsActive){
+        // auto-activate GPS tracking after a successful findMe
+        gpsWatchId = navigator.geolocation.watchPosition(onGPS, onGPSErr,
+          {enableHighAccuracy:true, maximumAge:2000, timeout:15000});
+        gpsActive=true;
+        document.getElementById('gps-label').textContent='Stop GPS';
+        document.getElementById('btn-gps').classList.add('active');
+      }
+    },
+    err => onGPSErr(err),
+    {enableHighAccuracy:true, timeout:15000}
+  );
+}
+
+// ── Location search (uses Nominatim) ────────────────────────────
+async function searchLocation(){
+  const q = document.getElementById('search-input').value.trim();
+  if(!q) return;
+  // Check if it's a direct lat,lng input like "25.0330, 121.5654"
+  const coordMatch = q.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if(coordMatch){
+    const lat=parseFloat(coordMatch[1]), lng=parseFloat(coordMatch[2]);
+    if(lat>=-90&&lat<=90&&lng>=-180&&lng<=180){
+      map.setView([lat,lng],15);
+      currentPos={lat,lng};
+      placeSearchMarker(lat,lng,'Custom location: '+lat.toFixed(5)+', '+lng.toFixed(5));
+      return;
+    }
+  }
+  document.getElementById('search-btn').textContent='...';
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const res=await fetch(url,{headers:{'Accept-Language':'en'}});
+    const data=await res.json();
+    if(!data.length){ showToast('Location not found'); }
+    else{
+      const {lat,lon,display_name}=data[0];
+      const la=parseFloat(lat), lo=parseFloat(lon);
+      map.setView([la,lo],15);
+      currentPos={lat:la,lng:lo};
+      placeSearchMarker(la,lo,display_name);
+    }
+  }catch(err){ showToast('Search failed - check internet connection'); }
+  document.getElementById('search-btn').textContent='Go';
+}
+
+let searchMarker=null;
+function placeSearchMarker(lat,lng,label){
+  if(searchMarker) map.removeLayer(searchMarker);
+  searchMarker=L.marker([lat,lng]).addTo(map);
+  searchMarker.bindPopup('<b>Search result</b><br>'+escHtml(label.substring(0,120))).openPopup();
+  showToast('Found: '+label.substring(0,50));
+}
+
+// ── Draw polyline ───────────────────────────────────────────────
+function toggleDraw(){
+  if(measureMode) toggleMeasure();
+  drawMode = !drawMode;
+  document.getElementById('btn-draw').classList.toggle('active', drawMode);
+  document.getElementById('btn-draw-done').style.display = drawMode ? '' : 'none';
+  map.getContainer().style.cursor = drawMode ? 'crosshair' : '';
+  if(drawMode){
+    map.on('click', onDrawClick);
+    showToast('Tap the map to add points, then tap Done');
+  } else {
+    map.off('click', onDrawClick);
+    drawPoints=[];
+    drawMarkers.forEach(m=>map.removeLayer(m)); drawMarkers=[];
+    if(drawPolyline){ map.removeLayer(drawPolyline); drawPolyline=null; }
+  }
+}
+function onDrawClick(e){
+  const {lat,lng}=e.latlng;
+  drawPoints.push([lat,lng]);
+  const m=L.circleMarker([lat,lng],{radius:6,color:'#D85A30',fillColor:'#F09595',fillOpacity:1,weight:2}).addTo(map);
+  drawMarkers.push(m);
+  if(drawPolyline) map.removeLayer(drawPolyline);
+  if(drawPoints.length>1)
+    drawPolyline=L.polyline(drawPoints,{color:'#D85A30',weight:3,opacity:0.9,dashArray:'6,4'}).addTo(map);
+}
+function finishPolyline(){
+  if(drawPoints.length<2){ alert('Add at least 2 points first'); return; }
+  map.off('click', onDrawClick);
+  drawMarkers.forEach(m=>map.removeLayer(m)); drawMarkers=[];
+  if(drawPolyline){ map.removeLayer(drawPolyline); drawPolyline=null; }
+  const color=COLORS[layers.length%COLORS.length];
+  const pl=L.polyline(drawPoints,{color,weight:4,opacity:0.9}).addTo(map);
+  const dist=calcDist(drawPoints);
+  const name='Drawn line '+(layers.filter(l=>l.type==='polyline').length+1);
+  pl.bindPopup('<b>'+name+'</b><br>'+fmtDist(dist));
+  layers.push({type:'polyline', name, color, dist, pts:[...drawPoints], leaflet:pl});
+  drawPoints=[]; drawMode=false;
+  document.getElementById('btn-draw').classList.remove('active');
+  document.getElementById('btn-draw-done').style.display='none';
+  map.getContainer().style.cursor='';
+  renderLayers(); switchTab('layers');
+}
+
+// ── Measure ─────────────────────────────────────────────────────
+function toggleMeasure(){
+  if(drawMode) toggleDraw();
+  measureMode = !measureMode;
+  document.getElementById('btn-measure').classList.toggle('active', measureMode);
+  document.getElementById('btn-measure-done').style.display = measureMode ? '' : 'none';
+  document.getElementById('measure-status').style.display = measureMode ? '' : 'none';
+  map.getContainer().style.cursor = measureMode ? 'crosshair' : '';
+  if(measureMode){
+    map.on('click', onMeasureClick);
+    showToast('Tap points to measure, then tap Done');
+  } else {
+    map.off('click', onMeasureClick);
+    clearMeasureTemp(true);
+  }
+}
+function onMeasureClick(e){
+  const {lat,lng}=e.latlng;
+  measurePoints.push([lat,lng]);
+  const m=L.circleMarker([lat,lng],{radius:5,color:'#1D9E75',fillColor:'#6EE7B7',fillOpacity:1,weight:2}).addTo(map);
+  measureMarkers.push(m);
+  if(measurePolyline) map.removeLayer(measurePolyline);
+  if(measurePoints.length>1){
+    measurePolyline=L.polyline(measurePoints,{color:'#1D9E75',weight:2,opacity:0.9,dashArray:'5,4'}).addTo(map);
+    const total=calcDist(measurePoints);
+    document.getElementById('measure-display').textContent=fmtDist(total);
+    const prev=measurePoints[measurePoints.length-2];
+    const curr=measurePoints[measurePoints.length-1];
+    const seg=map.distance(prev,curr);
+    const mid=[(prev[0]+curr[0])/2,(prev[1]+curr[1])/2];
+    const lbl=L.tooltip({permanent:true,direction:'top',className:'measure-label',offset:[0,-4]})
+      .setLatLng(mid).setContent(fmtDist(seg)).addTo(map);
+    measureLabels.push(lbl);
+  }
+}
+function finishMeasure(){
+  if(measurePoints.length<2){ clearMeasureTemp(true); toggleMeasure(); return; }
+  const total=calcDist(measurePoints);
+  const area=measurePoints.length>=3 ? calcArea(measurePoints) : null;
+  const color='#1D9E75';
+  const pl=L.polyline(measurePoints,{color,weight:2,opacity:0.9}).addTo(map);
+  let popup='<b>Measurement</b><br>Distance: '+fmtDist(total);
+  if(area) popup+='<br>Area: '+fmtArea(area);
+  pl.bindPopup(popup).openPopup();
+  const name='Measurement '+(layers.filter(l=>l.type==='measure').length+1);
+  layers.push({type:'measure', name, color, dist:total, area, pts:[...measurePoints], leaflet:pl});
+  measureLabels=[]; // keep on map
+  clearMeasureTemp(false);
+  measureMode=false;
+  document.getElementById('btn-measure').classList.remove('active');
+  document.getElementById('btn-measure-done').style.display='none';
+  document.getElementById('measure-status').style.display='none';
+  map.getContainer().style.cursor='';
+  map.off('click', onMeasureClick);
+  renderLayers(); switchTab('layers');
+}
+function clearMeasureTemp(removeLabels){
+  measureMarkers.forEach(m=>map.removeLayer(m)); measureMarkers=[];
+  if(measurePolyline){ map.removeLayer(measurePolyline); measurePolyline=null; }
+  if(removeLabels){ measureLabels.forEach(l=>map.removeLayer(l)); measureLabels=[]; }
+  measurePoints=[];
+  document.getElementById('measure-display').textContent='0m';
+}
+
+// ── Notes ───────────────────────────────────────────────────────
+function addNoteAtGPS(){
+  if(!currentPos){ alert('Please start GPS first'); return; }
+  document.getElementById('modal-coords').textContent=currentPos.lat.toFixed(5)+', '+currentPos.lng.toFixed(5);
+  document.getElementById('note-title-input').value='';
+  document.getElementById('note-body-input').value='';
+  document.getElementById('note-modal').classList.add('open');
+}
+function closeNoteModal(){ document.getElementById('note-modal').classList.remove('open'); }
+function saveNote(){
+  const title=document.getElementById('note-title-input').value.trim()||'Note';
+  const body=document.getElementById('note-body-input').value.trim();
+  const {lat,lng}=currentPos;
+  const ts=new Date().toLocaleString();
+  const icon=L.divIcon({
+    html:'<div style="background:#185FA5;color:#fff;width:26px;height:26px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:13px"><span style="transform:rotate(45deg)">N</span></div>',
+    iconSize:[26,26], iconAnchor:[13,26], className:''
+  });
+  const mk=L.marker([lat,lng],{icon}).addTo(map);
+  mk.bindPopup('<b>'+escHtml(title)+'</b>'+(body?'<br>'+escHtml(body):'')+'<br><small>'+ts+'</small>');
+  const note={title,body,lat,lng,ts,leaflet:mk};
+  notes.push(note);
+  closeNoteModal();
+  renderNotes(); switchTab('notes');
+}
+function renderNotes(){
+  const list=document.getElementById('notes-list');
+  const empty=document.getElementById('notes-empty');
+  document.getElementById('note-count').textContent=notes.length+' note'+(notes.length!==1?'s':'');
+  if(!notes.length){ empty.style.display=''; list.innerHTML=''; return; }
+  empty.style.display='none';
+  list.innerHTML=notes.map((n,i)=>
+    '<div class="list-item">'+
+    '<div class="item-name">'+escHtml(n.title)+'</div>'+
+    (n.body?'<div style="color:#444;font-size:12px">'+escHtml(n.body)+'</div>':'')+
+    '<div class="item-meta">'+
+    '<span>'+n.lat.toFixed(4)+', '+n.lng.toFixed(4)+'</span>'+
+    '<span>'+n.ts+'</span>'+
+    '<button class="go-btn" onclick="flyToNote('+i+')">Go</button>'+
+    '<button class="rm-btn" onclick="removeNote('+i+')">Remove</button>'+
+    '</div></div>'
+  ).join('');
+}
+function flyToNote(i){ map.flyTo([notes[i].lat,notes[i].lng],17); if(notes[i].leaflet) notes[i].leaflet.openPopup(); }
+function removeNote(i){ if(notes[i].leaflet) map.removeLayer(notes[i].leaflet); notes.splice(i,1); renderNotes(); }
+
+// ── Layers ──────────────────────────────────────────────────────
+function renderLayers(){
+  const list=document.getElementById('layers-list');
+  const empty=document.getElementById('layers-empty');
+  document.getElementById('layer-count').textContent=layers.length+' layer'+(layers.length!==1?'s':'');
+  if(!layers.length){ empty.style.display=''; list.innerHTML=''; return; }
+  empty.style.display='none';
+  list.innerHTML=layers.map((l,i)=>
+    '<div class="list-item" style="display:flex;align-items:center;gap:10px">'+
+    '<span class="dot" style="background:'+l.color+'"></span>'+
+    '<div style="flex:1;min-width:0">'+
+    '<div class="item-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escHtml(l.name)+'</div>'+
+    '<div class="item-meta">'+
+    '<span>'+l.type+'</span>'+
+    (l.dist!=null?'<span>'+fmtDist(l.dist)+'</span>':'')+
+    (l.area!=null?'<span>'+fmtArea(l.area)+'</span>':'')+
+    (l.count!=null?'<span>'+l.count+' features</span>':'')+
+    '</div></div>'+
+    '<div style="display:flex;gap:6px;flex-shrink:0">'+
+    '<button class="go-btn" onclick="flyToLayer('+i+')">Go</button>'+
+    '<button class="rm-btn" onclick="removeLayer('+i+')">Remove</button>'+
+    '</div></div>'
+  ).join('');
+}
+function flyToLayer(i){
+  const l=layers[i];
+  try{
+    if(l.bounds) map.fitBounds(l.bounds,{padding:[20,20]});
+    else if(Array.isArray(l.leaflet)&&l.leaflet.length){
+      const grp=L.featureGroup(l.leaflet.filter(f=>f.getBounds||f.getLatLng));
+      map.fitBounds(grp.getBounds(),{padding:[20,20]});
+    } else if(l.leaflet&&l.leaflet.getBounds) map.fitBounds(l.leaflet.getBounds(),{padding:[20,20]});
+  }catch(e){}
+}
+function removeLayer(i){
+  const l=layers[i];
+  if(Array.isArray(l.leaflet)) l.leaflet.forEach(f=>map.removeLayer(f));
+  else if(l.leaflet) map.removeLayer(l.leaflet);
+  layers.splice(i,1); renderLayers();
+}
+
+// ── KML/KMZ load ────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', async function(e){
+  const file=e.target.files[0]; if(!file) return;
+  const name=file.name;
+  const isKMZ=name.toLowerCase().endsWith('.kmz');
+  try{
+    let kmlText;
+    if(isKMZ){
+      const buf=await file.arrayBuffer();
+      const zip=await JSZip.loadAsync(buf);
+      const kmlFile=Object.values(zip.files).find(f=>f.name.toLowerCase().endsWith('.kml'));
+      if(!kmlFile){ alert('No KML file found inside the KMZ'); return; }
+      kmlText=await kmlFile.async('text');
+    } else {
+      kmlText=await file.text();
+    }
+    parseKML(kmlText, name);
+  } catch(err){ alert('Error reading file: '+err.message); }
+  e.target.value='';
+});
+
+function parseKML(text, filename){
+  const parser=new DOMParser();
+  const doc=parser.parseFromString(text,'text/xml');
+  const parseErr=doc.querySelector('parsererror');
+  if(parseErr){ alert('Invalid KML/XML: '+parseErr.textContent.substring(0,120)); return; }
+
+  const color=COLORS[layers.length%COLORS.length];
+  const features=[];
+  let bounds=null;
+  function ext(ll){ bounds = bounds ? bounds.extend(ll) : L.latLngBounds(ll,ll); }
+
+  doc.querySelectorAll('Placemark').forEach(pm=>{
+    const pname=(pm.querySelector('name')||{}).textContent||'';
+    const desc=(pm.querySelector('description')||{}).textContent||'';
+    const popup=(pname||desc) ? '<b>'+escHtml(pname)+'</b>'+(desc?'<br>'+escHtml(desc.substring(0,300)):'') : null;
+
+    // LineString
+    const lineEl=pm.querySelector('LineString coordinates');
+    if(lineEl){
+      const pts=parseCoords(lineEl.textContent);
+      if(pts.length>1){
+        const pl=L.polyline(pts,{color,weight:3}).addTo(map);
+        if(popup) pl.bindPopup(popup);
+        features.push(pl); pts.forEach(ext);
+      }
+    }
+    // MultiGeometry LineStrings
+    pm.querySelectorAll('MultiGeometry LineString coordinates').forEach(el=>{
+      const pts=parseCoords(el.textContent);
+      if(pts.length>1){
+        const pl=L.polyline(pts,{color,weight:3}).addTo(map);
+        if(popup) pl.bindPopup(popup);
+        features.push(pl); pts.forEach(ext);
+      }
+    });
+    // Polygon
+    const polyEl=pm.querySelector('Polygon outerBoundaryIs LinearRing coordinates');
+    if(polyEl){
+      const pts=parseCoords(polyEl.textContent);
+      if(pts.length){
+        const pg=L.polygon(pts,{color,weight:2,fillOpacity:0.12}).addTo(map);
+        if(popup) pg.bindPopup(popup);
+        features.push(pg); pts.forEach(ext);
+      }
+    }
+    // Point
+    const ptEl=pm.querySelector('Point coordinates');
+    if(ptEl){
+      const parts=ptEl.textContent.trim().split(/[\s,]+/).filter(Boolean).map(Number);
+      if(parts.length>=2){
+        const ll=[parts[1],parts[0]];
+        const mk=L.circleMarker(ll,{radius:7,color,fillColor:color,fillOpacity:0.85,weight:2}).addTo(map);
+        if(popup) mk.bindPopup(popup);
+        features.push(mk); ext(ll);
+      }
+    }
+  });
+
+  if(!features.length){ alert('No supported features found in file (Points, Lines, or Polygons)'); return; }
+  layers.push({type:'KML', name:filename, color, count:features.length, dist:null, leaflet:features, bounds});
+  if(bounds) map.fitBounds(bounds,{padding:[30,30]});
+  renderLayers(); switchTab('layers');
+  showToast('Loaded '+features.length+' features from '+filename);
+}
+
+function parseCoords(raw){
+  return raw.trim().split(/\s+/).map(s=>{
+    const p=s.split(',').map(Number);
+    return (p.length>=2 && !isNaN(p[0]) && !isNaN(p[1])) ? [p[1],p[0]] : null;
+  }).filter(Boolean);
+}
+
+// ── Export ──────────────────────────────────────────────────────
+function showExportModal(){
+  document.getElementById('export-summary').textContent=
+    layers.length+' layer(s), '+notes.length+' note(s)';
+  document.getElementById('export-filename').value=
+    'MapApp_'+new Date().toISOString().slice(0,10);
+  document.getElementById('export-modal').classList.add('open');
+}
+
+function buildKML(){
+  const parts=[];
+  parts.push('<?xml version="1.0" encoding="UTF-8"?>');
+  parts.push('<kml xmlns="http://www.opengis.net/kml/2.2"><Document>');
+  parts.push('<name>MapApp Export</name>');
+
+  // Styles
+  COLORS.forEach(hex=>{
+    const id='s'+hex.slice(1);
+    const rgb=hex.slice(1);
+    parts.push('<Style id="'+id+'"><LineStyle><color>ff'+rgb+'</color><width>3</width></LineStyle>'+
+      '<PolyStyle><color>33'+rgb+'</color></PolyStyle></Style>');
+  });
+  parts.push('<Style id="snote"><IconStyle><color>ffFFFFFF</color><scale>1.0</scale>'+
+    '<Icon><href>http://maps.google.com/mapfiles/ms/icons/blue-dot.png</href></Icon></IconStyle></Style>');
+
+  // Layers
+  layers.forEach(l=>{
+    const styleId='#s'+(l.color||COLORS[0]).slice(1);
+    if(l.type==='polyline'||l.type==='measure'){
+      const pts=l.pts;
+      if(!pts||!pts.length) return;
+      const coords=pts.map(p=>p[1]+','+p[0]+',0').join(' ');
+      let desc='Distance: '+fmtDist(l.dist);
+      if(l.area) desc+=' | Area: '+fmtArea(l.area);
+      parts.push('<Placemark><name>'+escXml(l.name)+'</name>'+
+        '<description>'+escXml(desc)+'</description>'+
+        '<styleUrl>'+styleId+'</styleUrl>'+
+        '<LineString><tessellate>1</tessellate><coordinates>'+coords+'</coordinates></LineString>'+
+        '</Placemark>');
+    } else if(l.type==='KML'&&Array.isArray(l.leaflet)){
+      l.leaflet.forEach((f,fi)=>{
+        const fname=escXml(l.name+' #'+(fi+1));
+        if(f.getLatLngs){
+          let lls=f.getLatLngs();
+          if(lls[0]&&Array.isArray(lls[0])) lls=lls[0];
+          const coords=lls.map(p=>p.lng+','+p.lat+',0').join(' ');
+          const isP=(f instanceof L.Polygon);
+          parts.push('<Placemark><name>'+fname+'</name><styleUrl>'+styleId+'</styleUrl>');
+          if(isP) parts.push('<Polygon><outerBoundaryIs><LinearRing><coordinates>'+coords+'</coordinates></LinearRing></outerBoundaryIs></Polygon>');
+          else parts.push('<LineString><tessellate>1</tessellate><coordinates>'+coords+'</coordinates></LineString>');
+          parts.push('</Placemark>');
+        } else if(f.getLatLng){
+          const p=f.getLatLng();
+          parts.push('<Placemark><name>'+fname+'</name><styleUrl>#snote</styleUrl>'+
+            '<Point><coordinates>'+p.lng+','+p.lat+',0</coordinates></Point></Placemark>');
+        }
+      });
+    }
+  });
+
+  // Notes
+  notes.forEach(n=>{
+    parts.push('<Placemark>'+
+      '<name>'+escXml(n.title)+'</name>'+
+      (n.body?'<description>'+escXml(n.body)+'</description>':'')+
+      '<styleUrl>#snote</styleUrl>'+
+      '<Point><coordinates>'+n.lng+','+n.lat+',0</coordinates></Point>'+
+      '</Placemark>');
+  });
+
+  parts.push('</Document></kml>');
+  return parts.join('\n');
+}
+
+async function doExport(fmt){
+  if(!layers.length&&!notes.length){ alert('Nothing to export yet.'); return; }
+  const kml=buildKML();
+  const fname=(document.getElementById('export-filename').value.trim()||'MapApp_export');
+  if(fmt==='kml'){
+    dlBlob(new Blob([kml],{type:'application/vnd.google-earth.kml+xml'}), fname+'.kml');
+  } else {
+    const zip=new JSZip();
+    zip.file('doc.kml', kml);
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});
+    dlBlob(blob, fname+'.kmz');
+  }
+  document.getElementById('export-modal').classList.remove('open');
+  showToast('Exported: '+fname+'.'+(fmt==='kml'?'kml':'kmz'));
+}
+
+function dlBlob(blob, filename){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 600);
+}
+
+function showSaveHelp(){ document.getElementById('save-modal').classList.add('open'); }
+
+// ── Helpers ─────────────────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.tab[onclick="switchTab(\''+tab+'\')"]').classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+}
+function calcDist(pts){
+  let d=0; for(let i=1;i<pts.length;i++) d+=map.distance(pts[i-1],pts[i]); return d;
+}
+function fmtDist(m){ return m<1000 ? Math.round(m)+'m' : (m/1000).toFixed(2)+'km'; }
+function calcArea(pts){
+  let a=0; const n=pts.length;
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n;
+    const x0=pts[i][1]*111320*Math.cos(pts[i][0]*Math.PI/180);
+    const y0=pts[i][0]*110540;
+    const x1=pts[j][1]*111320*Math.cos(pts[j][0]*Math.PI/180);
+    const y1=pts[j][0]*110540;
+    a+=x0*y1-x1*y0;
+  }
+  return Math.abs(a/2);
+}
+function fmtArea(m2){
+  if(m2>=1e6) return (m2/1e6).toFixed(3)+' km2';
+  if(m2>=10000) return (m2/10000).toFixed(2)+' ha';
+  return Math.round(m2)+' m2';
+}
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;'); }
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0', 2600);
+}
+
+map.on('mousemove',e=>{ document.getElementById('coord-display').textContent=e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5); });
+map.on('click',e=>{ if(!drawMode&&!measureMode) document.getElementById('coord-display').textContent=e.latlng.lat.toFixed(5)+', '+e.latlng.lng.toFixed(5); });
+
+// ── Long-press map to manually set location ──────────────────────
+let longPressTimer=null, longPressLatLng=null;
+const mapEl=document.getElementById('map');
+
+function startLongPress(latlng){
+  longPressLatLng=latlng;
+  longPressTimer=setTimeout(()=>{ confirmSetLocation(latlng); }, 600);
+}
+function cancelLongPress(){ clearTimeout(longPressTimer); longPressLatLng=null; }
+
+map.on('mousedown',e=>startLongPress(e.latlng));
+map.on('mouseup', cancelLongPress);
+map.on('mousemove',cancelLongPress);
+map.on('touchstart',e=>{ if(e.originalEvent.touches.length===1) startLongPress(e.latlng); });
+map.on('touchend', cancelLongPress);
+map.on('touchmove', cancelLongPress);
+
+let manualLocationMarker=null;
+function confirmSetLocation(latlng){
+  const {lat,lng}=latlng;
+  currentPos={lat,lng};
+  document.getElementById('coord-display').textContent=lat.toFixed(5)+', '+lng.toFixed(5);
+  document.getElementById('accuracy-display').textContent='Manual location';
+  document.getElementById('gps-banner').style.display='none';
+  if(manualLocationMarker) map.removeLayer(manualLocationMarker);
+  manualLocationMarker=L.marker([lat,lng],{
+    icon:L.divIcon({
+      html:'<div style="width:22px;height:22px;background:#D85A30;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
+      iconSize:[22,22],iconAnchor:[11,22],className:''
+    })
+  }).addTo(map);
+  manualLocationMarker.bindPopup('<b>Your manual location</b><br>'+lat.toFixed(5)+', '+lng.toFixed(5)+'<br><small>Long-press map to move it</small>').openPopup();
+  showToast('Location set! You can now add notes here.');
+}
+</script>
+</body>
+</html>
